@@ -6,6 +6,8 @@
 #
 # Reference: Molecular dynamics study of effect of different wetting conditions on evaporation and rapid boiling of ultra-thin argon layer over platinum surface. S.M. Shavik, Mohammad Nasim Hasan, A.K.M. Monjur Morshed, M. Quamrul Islam.
 #
+# run: mpiexec -np 8 ./lmp_mpi > in.walls
+#
 # #######################################################################
 
 
