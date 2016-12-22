@@ -6,13 +6,11 @@
 #
 # Reference: Molecular dynamics study of effect of different wetting conditions on evaporation and rapid boiling of ultra-thin argon layer over platinum surface. S.M. Shavik, Mohammad Nasim Hasan, A.K.M. Monjur Morshed, M. Quamrul Islam.
 #
-# run: mpiexec -np 8 ./lmp_mpi > in.walls.equilibration
-# 
+# run: mpiexec -np 8 ./lmp_mpi -in in.walls
+#
 # #######################################################################
 
 
-# LAMMPS log file named log.equilibration
-log log.equilibration
 
 ########################################
 #
@@ -52,10 +50,9 @@ neighbor    0.3 bin
 lattice     fcc 2.6
 #  define regions
 region      simbox block 0.0 15.0 0.0 15.0 0.0 30.0
-region      wallUpper block 0.0 14.5 0.0 14.5 20.0 25.0 
-region      wallBottom block 0.0 14.5 0.0 14.5 5.0 10.0 
-region      springsUpper block 0.0 14.5 0.0 14.5 25.0 25.0 
-region      springsBottom block 0.0 14.5 0.0 14.5 5.0 5.0
+region      wallUpper block 0.0 15.0 0.0 15.0 25.0 30.0 
+region      wallBottom block 0.0 15.0 0.0 15.0 0.0 5.0 
+region      fixedBottom block 0.0 15.0 0.0 15.0 0.0 0.0
 region      bulk block 1.0 13.0 1.0 13.0 12.0 18.0
 
 ############
@@ -82,11 +79,9 @@ group       upper region wallUpper
 group       lower region wallBottom
 group       wall union upper lower
 set         group wall type 1
-#  create the group "wallSpring"   
-group       springsUpper region springsUpper
-group       springsBottom region springsBottom
-group       wallSpring union springsUpper springsBottom
-set         group wallSpring type 1
+#  create the group "fixedBottom"   
+group        fixedBottom region fixedBottom
+set          group fixedBottom type 1
 
 #  specify initial positions of atoms between walls. 
 #  place atoms of type 2 in "bulk".
@@ -94,11 +89,10 @@ lattice sc 1.3
 create_atoms    2 region bulk
 mass            2 1.0
 #  create the group "fluid" 
-group       fluid subtract all wall wallSpring  
+group       fluid subtract all wall fixedBottom 
 set         group fluid type 2 
-#  create the group "lowerWallNoSprings" and "upperWallNoSprings"
-group       lowerWallNoSprings subtract all wallSpring upper fluid 
-group       upperWallNoSprings subtract all wallSpring lower fluid
+#  create the group "lowerWallNoFixed"
+group       lowerWallNoFixed subtract all fixedBottom upper fluid 
 
 ########################################
 #
@@ -125,7 +119,7 @@ pair_modify shift yes
 
 # Set each component of force on each atom in the group to the specified values fx,fy,fz.
 # fix ID group-ID setforce fx fy fz
-fix     force wallSpring setforce 0.0 0.0 0.0
+fix      force fixedBottom setforce 0.0 0.0 0.0
 
 ########################################
 #
@@ -142,16 +136,16 @@ fix nve all nve
 #   langevin thermostat   
 #   fix ID group-ID langevin Tstart Tstop damp seed
 fix langFluid fluid langevin 1.5 1.5 0.5 3216
-fix langLowerWall lowerWallNoSprings langevin 1.5 1.5 0.5 3215
-fix langUpperWall upperWallNoSprings langevin 1.5 1.5 0.5 6586
+fix langLowerWall lowerWallNoFixed langevin 1.5 1.5 0.5 3215
+fix langUpperWall upper langevin 1.5 1.5 0.5 6586
 
-#  compute the temperature of the groups "lowerWallNoSprings", "upperWallNoSprings" and "fluid". 
-compute     tempLower lowerWallNoSprings temp 
-compute     tempUpper upperWallNoSprings temp
+#  compute the temperature of the groups "lowerWallNoFixed", "upper" and "fluid". 
+compute     tempLower lowerWallNoFixed temp 
+compute     tempUpper upper temp
 compute     tempFluid fluid temp
 
 #  create vmd input to visualize the system during the process.  
-dump        movie all atom 100 movie.equilibration.lammpstrj
+dump        movie all atom 100 movie.lammpstrj
 #  specify thermodynamic properties to be output
 thermo_style custom step temp c_tempFluid c_tempLower c_tempUpper pe ke etotal
 #  report instantaneous thermo values 
@@ -163,6 +157,5 @@ unfix langFluid
 unfix langLowerWall
 unfix langUpperWall
 
-#   save equilibartion process
+#  save equilibartion process
 write_restart restart.equilibration
-

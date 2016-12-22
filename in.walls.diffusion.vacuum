@@ -6,11 +6,16 @@
 #
 # Reference: Molecular dynamics study of effect of different wetting conditions on evaporation and rapid boiling of ultra-thin argon layer over platinum surface. S.M. Shavik, Mohammad Nasim Hasan, A.K.M. Monjur Morshed, M. Quamrul Islam.
 #
-# run: mpiexec -np 8 ./lmp_mpi -in in.walls
+# run: mpiexec -np 8 ./lmp_mpi > in.walls.production
 #
 # #######################################################################
 
 
+# LAMMPS log file named log.production 
+log log.diffusion
+
+# Read in a previously saved system configuration from a restart file. This allows continuation of a previous run 
+read_restart restart.final
 
 ########################################
 #
@@ -20,13 +25,15 @@
 
 
 #  define units
-units   lj
+#units   lj
 
 #  specify periodic boundary conditions
-boundary p p p
+#boundary p p p
 
 #  define time step
 timestep    0.005
+variable dt equal 0.005
+
 
 #  specify parameters for neighbor list 
 #  rnbr = rcut + 0.3
@@ -47,13 +54,14 @@ neighbor    0.3 bin
 
 #  fcc = body-centered cubic structure 
 #  density 2.6
-lattice     fcc 2.6
+#lattice     fcc 2.6
 #  define regions
-region      simbox block 0.0 15.0 0.0 15.0 0.0 30.0
-region      wallUpper block 0.0 15.0 0.0 15.0 25.0 30.0 
-region      wallBottom block 0.0 15.0 0.0 15.0 0.0 5.0 
-region      fixedBottom block 0.0 15.0 0.0 15.0 0.0 0.0
-region      bulk block 1.0 13.0 1.0 13.0 12.0 18.0
+#region      simbox block 0.0 15.0 0.0 15.0 0.0 30.0
+#region      wallUpper block 0.0 14.5 0.0 14.5 20.0 25.0 
+#region      wallBottom block 0.0 14.5 0.0 14.5 5.0 10.0 
+#region      springsUpper block 0.0 14.5 0.0 14.5 25.0 25.0 
+#region      springsBottom block 0.0 14.5 0.0 14.5 5.0 5.0
+#region      bulk block 1.0 13.0 1.0 13.0 12.0 18.0
 
 ############
 #  Sometimes we need to specify the number of particles: 
@@ -68,31 +76,34 @@ region      bulk block 1.0 13.0 1.0 13.0 12.0 18.0
 #   create simulation box
 #   create_box N region-ID
 #   N = # of atom types to use in this simulation
-create_box  2 simbox
+#create_box  2 simbox
 
 #  place atoms of type 1 in "wallUpper" and "wallBottom" 
-create_atoms    1 region wallUpper  
-create_atoms    1 region wallBottom
-mass            1 5.0
+#create_atoms    1 region wallUpper  
+#create_atoms    1 region wallBottom
+#mass            1 5.0
 #  create the group "wall"   
-group       upper region wallUpper
-group       lower region wallBottom
-group       wall union upper lower
-set         group wall type 1
-#  create the group "fixedBottom"   
-group        fixedBottom region fixedBottom
-set          group fixedBottom type 1
+#group       upper region wallUpper
+#group       lower region wallBottom
+#group       wall union upper lower
+#set         group wall type 1
+#  create the group "wallSpring"   
+#group       springsUpper region springsUpper
+#group       springsBottom region springsBottom
+#group       wallSpring union springsUpper springsBottom
+#set         group wallSpring type 1
 
 #  specify initial positions of atoms between walls. 
 #  place atoms of type 2 in "bulk".
-lattice sc 1.3
-create_atoms    2 region bulk
-mass            2 1.0
+#lattice sc 1.3
+#create_atoms    2 region bulk
+#mass            2 1.0
 #  create the group "fluid" 
-group       fluid subtract all wall fixedBottom 
-set         group fluid type 2 
-#  create the group "lowerWallNoFixed"
-group       lowerWallNoFixed subtract all fixedBottom upper fluid 
+group       fluid subtract all wall wallSpring  
+#set         group fluid type 2 
+#  create the group "lowerWallNoSprings" and "upperWallNoSprings"
+group       lowerWallNoSprings subtract all wallSpring upper fluid 
+group       upperWallNoSprings subtract all wallSpring lower fluid
 
 ########################################
 #
@@ -102,15 +113,15 @@ group       lowerWallNoFixed subtract all fixedBottom upper fluid
 
 #  specify interaction potential
 #  pairwise interaction via the Lennard-Jones potential with a cut-off at 2.5 lj-sigma
-pair_style  lj/cut 2.5
+#pair_style  lj/cut 2.5
 #  Type 1: Solid. Type 2: Fluid.  
 #  pair_coef type_i type_j epsilon sigma rcut
 #  specify parameters between atoms of type 1 with an atom of type 1
-pair_coeff  1 1 50 0.73 2.5
+#pair_coeff  1 1 50 0.73 2.5
 #  ... between atoms of type 2 and 2 
-pair_coeff  2 2 1 1 2.5
+#pair_coeff  2 2 1 1 2.5
 #  ... between atoms of type 1 and 2
-pair_coeff  1 2 1.0 0.84 2.5
+#pair_coeff  1 2 1.0 0.84 2.5
 
 pair_modify shift yes 
 #The shift keyword determines whether a Lennard-Jones potential is shifted at its cutoff to 0.0. If so, this adds an
@@ -119,7 +130,7 @@ pair_modify shift yes
 
 # Set each component of force on each atom in the group to the specified values fx,fy,fz.
 # fix ID group-ID setforce fx fy fz
-fix      force fixedBottom setforce 0.0 0.0 0.0
+fix     force wallSpring setforce 0.0 0.0 0.0
 
 ########################################
 #
@@ -135,52 +146,71 @@ fix      force fixedBottom setforce 0.0 0.0 0.0
 fix nve all nve
 #   langevin thermostat   
 #   fix ID group-ID langevin Tstart Tstop damp seed
-fix langFluid fluid langevin 1.5 1.5 0.5 3216
-fix langLowerWall lowerWallNoFixed langevin 1.5 1.5 0.5 3215
-fix langUpperWall upper langevin 1.5 1.5 0.5 6586
+#fix langFluid fluid langevin 1.5 1.5 0.5 3216
+#fix langLowerWall lowerWallNoSprings langevin 1.5 1.5 0.5 3215
+#fix langUpperWall upperWallNoSprings langevin 1.5 1.5 0.5 6586
 
-#  compute the temperature of the groups "lowerWallNoFixed", "upper" and "fluid". 
-compute     tempLower lowerWallNoFixed temp 
-compute     tempUpper upper temp
-compute     tempFluid fluid temp
+#  compute the temperature of the groups "lowerWallNoSprings", "upperWallNoSprings" and "fluid". 
+#compute     tempLower lowerWallNoSprings temp 
+#compute     tempUpper upperWallNoSprings temp
+#compute     tempFluid fluid temp
 
 #  create vmd input to visualize the system during the process.  
 #dump        movie all atom 100 movie.lammpstrj
 #  specify thermodynamic properties to be output
-thermo_style custom step temp c_tempFluid c_tempLower c_tempUpper pe ke etotal
+#thermo_style custom step temp c_tempFluid c_tempLower c_tempUpper pe ke etotal
 #  report instantaneous thermo values 
-thermo 1000
+thermo 100
 #   run simulation
 #run 30000
-run 5000
 #   unfix langevin thermostat
-unfix langFluid
-unfix langLowerWall
-unfix langUpperWall
+#unfix langFluid
+#unfix langLowerWall
+#unfix langUpperWall
 
-#  save equilibartion process
-write_restart restart.equilibration
+#   save equilibartion process
+#write_restart restart.equilibration
 
 ##################
 #   PRODUCTION
 ##################   
 
-#  compute potencial energy per atom and kinetic energy per atom
-compute         pe all pe/atom
-compute         ke all ke/atom
-#   save positions and energy per atom in group fluid every 1 step
-dump    energies all custom 100 production.energy id x y z c_pe c_ke
-#   save positions 
-dump    positions all custom 100 production.positions id type x y z
-#   save velocities
-dump	velocities all custom 100 production.velocities id type vx vy vz 
+#dump   movie all atom 100 movie.production.lammpstrj
+
+#  compute potencial energy per atom and kinetic energy per atom. 
+#compute         pe all pe/atom
+#compute         ke all ke/atom
+#   save positions and energy per atom in group fluid every 1 step (filename = output.lammps).
+#dump    energies all custom 100 production.energy id x y z c_pe c_ke
+#   save positions (filename = output.positions)
+#dump    positions all custom 100 production.positions id type x y z
+#   save velocities (filename = output.velocities)
+#dump	velocities all custom 100 production.velocities id type vx vy vz 
 #   run simulation
-#run 30000
-run 5000
+#run 5000
+
 #  change the temperature group lower
-#velocity    lowerWallNoFixed create 10.0 87462 dist gaussian
+#velocity    lowerWallNoSprings create 10.0 87462 dist gaussian
 #  run simulation
 #run 300000
 
-# save last configuration
-#write_restart restart.lastconfiguration
+
+# save the last configuration
+#write_restart restart.final
+
+
+reset_timestep 0 
+
+# compute the mean square displacement
+# A vector of four quantites is calculated by this compute. The first 3 elements of the vector are the squared
+# dx,dy,dz displacements, summed and averaged over atoms in the group. The 4th element is the total squared
+# displacement, i.e. (dx*dx + dy*dy + dz*dz), summed and averaged over atoms in the group.
+dump   movie all atom 100 movie.diffusion.lammpstrj
+compute msdFluid fluid msd 
+# compute the diffusion coefficient
+variable D equal c_msdFluid[4]/6/(step*${dt}+1.0e-6)
+
+# specify output
+thermo_style custom step c_msdFluid[4] v_D
+# run simulation
+run 200000
