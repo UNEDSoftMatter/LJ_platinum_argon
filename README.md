@@ -1,6 +1,6 @@
 #LJ_platinum_argon
 
-lammps MD scripts to perform the simulation of fluid argon between two platinum walls when the temperature of the lower wall is increased.
+lammps MD scripts to perform the simulation of fluid argon between two platinum walls when the temperature of the walls is increased. Because of the pbc and absence of vacuum between the border of the walls and the border of the simulation box, we can considerar the two walls as only one. So, the simulation perform a solid platinum walls surrounded by a fluid argon.
 
 
 __in.walls__ performs the complete simulation (equilibration and production stages).__in.walls.equilibration__ only equilibration stage and __in.walls.production__ production stage.  
@@ -9,7 +9,7 @@ The input lammps files __in.walls.vacuum__, __in.walls.equilibration.vacuum__ an
 
 The simulation has three parts: 
 - In microcanonival ensemble, fluid and walls reach equilibrium with a langevin thermostat (T= 1.5)
-- Once the system is equilibrated, the temperature of the lower wall is increased (T = 10). 
+- Once the system is equilibrated, the temperature of the wall is increased (T = 10). 
 - Then, the system reaches the equilibrium. 
 
 The process is performed in the microcanonical ensemble. 
